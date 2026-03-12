@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: dbs-wordcloud-v2
+    env: node
+    buildCommand: npm install && npm run build:server
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://dbs-wordcloud-v2.vercel.app
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"

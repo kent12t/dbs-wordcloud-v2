@@ -1,59 +1,69 @@
-import fs from "node:fs";
-import path from "node:path";
-
-import Database from "better-sqlite3";
+import { createClient } from "@supabase/supabase-js";
 
 import { WordCloudWord } from "../shared/types.js";
 
-const configuredPath = process.env.SQLITE_PATH?.trim();
-const dbPath = configuredPath
-  ? path.isAbsolute(configuredPath)
-    ? configuredPath
-    : path.resolve(process.cwd(), configuredPath)
-  : path.resolve(process.cwd(), "data", "quiz.sqlite");
-
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+interface AnswerRow {
+  answer: string | null;
 }
 
-const db = new Database(dbPath);
-db.pragma("journal_mode = WAL");
-db.pragma("busy_timeout = 5000");
+function getRequiredEnv(name: "SUPABASE_URL" | "SUPABASE_KEY"): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS answers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_index INTEGER NOT NULL,
-    answer TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  return value;
+}
 
-const insertStmt = db.prepare(
-  "INSERT INTO answers (question_index, answer) VALUES (?, ?)"
-);
+const supabaseUrl = getRequiredEnv("SUPABASE_URL");
+const supabaseKey = getRequiredEnv("SUPABASE_KEY");
 
-const insertAnswersTx = db.transaction((answers: string[]) => {
-  answers.forEach((answer, index) => {
-    insertStmt.run(index, answer);
-  });
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
 });
 
-const aggregateStmt = db.prepare(
-  `
-  SELECT answer as text, COUNT(*) as count
-  FROM answers
-  GROUP BY answer
-  ORDER BY count DESC, answer ASC
-`
-);
+export async function insertAnswers(answers: string[]): Promise<void> {
+  const rows = answers.map((answer, index) => ({
+    question_index: index,
+    answer
+  }));
 
-export function insertAnswers(answers: string[]): void {
-  insertAnswersTx(answers);
+  const { error } = await supabase.from("answers").insert(rows);
+  if (error) {
+    throw new Error(`Unable to insert answers: ${error.message}`);
+  }
 }
 
-export function getWordCloudWords(): WordCloudWord[] {
-  const rows = aggregateStmt.all() as WordCloudWord[];
-  return rows;
+export async function getWordCloudWords(): Promise<WordCloudWord[]> {
+  const { data, error } = await supabase
+    .from("answers")
+    .select("answer")
+    .returns<AnswerRow[]>();
+
+  if (error) {
+    throw new Error(`Unable to load word cloud words: ${error.message}`);
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (!row.answer) {
+      continue;
+    }
+
+    const nextCount = (counts.get(row.answer) ?? 0) + 1;
+    counts.set(row.answer, nextCount);
+  }
+
+  return [...counts.entries()]
+    .map(([text, count]) => ({ text, count }))
+    .sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+
+      return a.text.localeCompare(b.text);
+    });
 }

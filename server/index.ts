@@ -33,13 +33,17 @@ function isAnswerSubmission(payload: unknown): payload is AnswerSubmission {
   return Array.isArray(submission.answers);
 }
 
-function buildWordCloudResponse(): WordCloudResponse {
-  return { words: getWordCloudWords() };
+async function buildWordCloudResponse(): Promise<WordCloudResponse> {
+  return { words: await getWordCloudWords() };
 }
 
-function broadcastWordCloud(): void {
-  const payload = buildWordCloudResponse();
-  const body = `event: wordcloud\ndata: ${JSON.stringify(payload)}\n\n`;
+function formatWordCloudEvent(payload: WordCloudResponse): string {
+  return `event: wordcloud\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+async function broadcastWordCloud(): Promise<void> {
+  const payload = await buildWordCloudResponse();
+  const body = formatWordCloudEvent(payload);
   for (const client of sseClients) {
     try {
       client.write(body);
@@ -53,8 +57,12 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/wordcloud", (_req, res) => {
-  res.json(buildWordCloudResponse());
+app.get("/api/wordcloud", async (_req, res) => {
+  try {
+    res.json(await buildWordCloudResponse());
+  } catch {
+    res.status(500).json({ error: "Unable to load word cloud." });
+  }
 });
 
 app.get("/api/stream", (req, res) => {
@@ -66,12 +74,22 @@ app.get("/api/stream", (req, res) => {
 
   sseClients.add(res);
   res.write("retry: 5000\n\n");
-  res.write(
-    `event: wordcloud\ndata: ${JSON.stringify(buildWordCloudResponse())}\n\n`
-  );
+
+  void buildWordCloudResponse()
+    .then((payload) => {
+      res.write(formatWordCloudEvent(payload));
+    })
+    .catch(() => {
+      res.write(formatWordCloudEvent({ words: [] }));
+    });
 
   const heartbeat = setInterval(() => {
-    res.write(": heartbeat\n\n");
+    try {
+      res.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    }
   }, 20000);
 
   req.on("close", () => {
@@ -80,7 +98,7 @@ app.get("/api/stream", (req, res) => {
   });
 });
 
-app.post("/api/answers", (req, res) => {
+app.post("/api/answers", async (req, res) => {
   if (!isAnswerSubmission(req.body)) {
     res.status(400).json({ error: "Invalid request payload." });
     return;
@@ -108,9 +126,12 @@ app.post("/api/answers", (req, res) => {
   }
 
   try {
-    insertAnswers(answers);
-    broadcastWordCloud();
+    await insertAnswers(answers);
     res.status(201).json({ ok: true });
+
+    void broadcastWordCloud().catch(() => {
+      // Broadcast failures should not impact successful submissions.
+    });
   } catch {
     res.status(500).json({ error: "Unable to save answers." });
   }
