@@ -2,6 +2,7 @@ services:
   - type: web
     name: dbs-wordcloud-v2
     env: node
+    plan: free
     buildCommand: npm install && npm run build:server
     startCommand: npm start
     envVars:
