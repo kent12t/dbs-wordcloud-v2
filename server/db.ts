@@ -5,13 +5,21 @@ import Database from "better-sqlite3";
 
 import { WordCloudWord } from "../shared/types.js";
 
-const dataDir = path.resolve(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const configuredPath = process.env.SQLITE_PATH?.trim();
+const dbPath = configuredPath
+  ? path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.resolve(process.cwd(), configuredPath)
+  : path.resolve(process.cwd(), "data", "quiz.sqlite");
+
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, "quiz.sqlite");
 const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
+db.pragma("busy_timeout = 5000");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS answers (

@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 
 import cors from "cors";
 import express from "express";
@@ -11,12 +12,26 @@ const app = express();
 const port = Number(process.env.PORT ?? 3001);
 const sseClients = new Set<express.Response>();
 
+const allowedOrigins = process.env.CORS_ORIGINS?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: true
+    origin:
+      allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : true
   })
 );
 app.use(express.json());
+
+function isAnswerSubmission(payload: unknown): payload is AnswerSubmission {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+
+  const submission = payload as { answers?: unknown };
+  return Array.isArray(submission.answers);
+}
 
 function buildWordCloudResponse(): WordCloudResponse {
   return { words: getWordCloudWords() };
@@ -26,9 +41,17 @@ function broadcastWordCloud(): void {
   const payload = buildWordCloudResponse();
   const body = `event: wordcloud\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const client of sseClients) {
-    client.write(body);
+    try {
+      client.write(body);
+    } catch {
+      sseClients.delete(client);
+    }
   }
 }
+
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
 
 app.get("/api/wordcloud", (_req, res) => {
   res.json(buildWordCloudResponse());
@@ -36,11 +59,13 @@ app.get("/api/wordcloud", (_req, res) => {
 
 app.get("/api/stream", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
   sseClients.add(res);
+  res.write("retry: 5000\n\n");
   res.write(
     `event: wordcloud\ndata: ${JSON.stringify(buildWordCloudResponse())}\n\n`
   );
@@ -56,7 +81,12 @@ app.get("/api/stream", (req, res) => {
 });
 
 app.post("/api/answers", (req, res) => {
-  const body = req.body as AnswerSubmission;
+  if (!isAnswerSubmission(req.body)) {
+    res.status(400).json({ error: "Invalid request payload." });
+    return;
+  }
+
+  const body = req.body;
   const answers = body?.answers;
 
   if (!Array.isArray(answers) || answers.length !== QUESTIONS.length) {
@@ -87,14 +117,16 @@ app.post("/api/answers", (req, res) => {
 });
 
 const clientDistPath = path.resolve(process.cwd(), "client", "dist");
-app.use(express.static(clientDistPath));
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
 
-app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api")) {
-    next();
-    return;
-  }
-  res.sendFile(path.join(clientDistPath, "index.html"));
-});
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
 
 app.listen(port);
