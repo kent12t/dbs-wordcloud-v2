@@ -15,10 +15,10 @@ const SHARE_LABELS = [
 
 export function ShareCard({ answers }: ShareCardProps) {
   return (
-    <section className="border border-[#878683]/60 bg-[#0A0A0A] p-4">
+    <section className="relative overflow-hidden border border-[#878683]/60 bg-[#0A0A0A] p-4">
       <DBSLogo showTagline />
 
-      <p className="mt-8 text-center text-[12px] font-bold tracking-[-0.24px] text-dbs-red">
+      <p className="mt-8 text-center text-[12px] font-bold tracking-[-0.24px] text-[#CA3631]">
         DBS Global Financial Markets Event 2026
       </p>
 
@@ -32,7 +32,7 @@ export function ShareCard({ answers }: ShareCardProps) {
             key={question.id}
             className="rounded-[4px] border-l-2 border-[#878683] bg-white/5 px-2 py-1"
           >
-            <p className="text-[10px] font-bold tracking-[-0.2px] text-dbs-red">
+            <p className="text-[10px] font-bold tracking-[-0.2px] text-[#CA3631]">
               {SHARE_LABELS[index]}
             </p>
 
@@ -43,7 +43,7 @@ export function ShareCard({ answers }: ShareCardProps) {
         ))}
       </ul>
 
-      <p className="mt-8 text-center text-[13px] font-extrabold uppercase tracking-[-0.26px] text-dbs-red">
+      <p className="mt-8 text-center text-[13px] font-extrabold uppercase tracking-[-0.26px] text-[#CA3631]">
         Future-Proof Your Money With DBS
       </p>
     </section>

@@ -8,7 +8,7 @@ import { QuestionCard } from "../components/QuestionCard";
 import { useQuiz } from "../hooks/useQuiz";
 
 const QUESTION_LABELS = [
-  "Geopolitical Shifts",
+  "Global Outlook",
   "Global Realignment",
   "Interest Rates",
   "Regional Growth",
@@ -33,13 +33,16 @@ export function QuizPage() {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#0A0A0A] text-[#F0EDE8]">
         <BrandBackground />
-        <div className="relative mx-auto flex min-h-screen w-full max-w-[390px] flex-col items-center px-6 pb-10 pt-16">
-          <div className="w-full pl-1">
-            <DBSLogo showTagline />
+        <div className="relative mx-auto flex min-h-screen w-full max-w-[390px] flex-col items-center px-8 pb-10 pt-[68px]">
+          <div className="w-full">
+            <DBSLogo showTagline className="w-[182px]" />
           </div>
 
-          <section className="mt-[92px] text-center">
-            <p className="text-[12px] font-bold uppercase tracking-[-0.24px] text-dbs-red">
+          <div className="pointer-events-none absolute left-1/2 top-[372px] h-[304px] w-[304px] -translate-x-1/2 rounded-full border border-[#CA3631]/20" />
+          <div className="pointer-events-none absolute left-1/2 top-[398px] h-[252px] w-[252px] -translate-x-1/2 rounded-full border border-[#CA3631]/20" />
+
+          <section className="relative mt-[85px] text-center">
+            <p className="text-[12px] font-bold uppercase tracking-[-0.24px] text-[#CA3631]">
               DBS Global Financial Markets Event 2026
             </p>
 
@@ -61,7 +64,7 @@ export function QuizPage() {
           <button
             type="button"
             onClick={() => setHasStarted(true)}
-            className="mb-10 mt-auto inline-flex min-h-11 items-center justify-center bg-dbs-red px-8 py-4 text-[13px] font-semibold tracking-[0.02em] text-[#F0EDE8] transition-colors hover:bg-[#f2362e]"
+            className="mb-10 mt-auto inline-flex min-h-11 items-center justify-center bg-[#CA3631] px-8 py-4 text-[13px] font-semibold tracking-[0.02em] text-[#F0EDE8] transition-colors hover:bg-[#d3423d]"
           >
             BEGIN EXPERIENCE →
           </button>
@@ -70,8 +73,7 @@ export function QuizPage() {
     );
   }
 
-  const progressClassNames = ["w-1/5", "w-2/5", "w-3/5", "w-4/5", "w-full"];
-  const progressWidthClass = progressClassNames[currentIndex] ?? "w-1/5";
+  const progressPercent = ((currentIndex + 1) / QUESTIONS.length) * 100;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0A0A0A] text-[#F0EDE8]">
@@ -79,9 +81,7 @@ export function QuizPage() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-[390px] flex-col px-6 pb-20 pt-4">
         <header className="flex items-start justify-between py-3">
-          <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-dbs-red text-xl text-white">
-            ✶
-          </div>
+          <DBSLogo compact className="w-10" />
 
           <p className="max-w-[106px] text-right text-[10px] font-bold tracking-[-0.2px] text-[#878683]">
             DBS Global Financial
@@ -118,10 +118,8 @@ export function QuizPage() {
 
           <div className="relative h-[3px] w-full bg-[#878683]">
             <div
-              className={[
-                "h-[3px] bg-dbs-red transition-all duration-300",
-                progressWidthClass
-              ].join(" ")}
+              className="h-[3px] bg-[#CA3631] transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
 

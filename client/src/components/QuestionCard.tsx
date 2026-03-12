@@ -14,12 +14,12 @@ export function QuestionCard({
   onSelect
 }: QuestionCardProps) {
   return (
-    <section className="w-full">
-      <p className="w-full text-center text-[12px] font-bold uppercase tracking-[-0.24px] text-dbs-red">
+    <section className="w-full px-2">
+      <p className="w-full text-center text-[12px] font-bold uppercase tracking-[-0.24px] text-[#CA3631]">
         {label}
       </p>
 
-      <h2 className="mt-8 text-center text-[30px] font-bold leading-none tracking-[-0.9px] text-[#F0EDE8]">
+      <h2 className="mx-auto mt-8 max-w-[334px] text-center text-[30px] font-bold leading-[0.95] tracking-[-0.9px] text-[#F0EDE8]">
         {question.prompt}
       </h2>
 
@@ -34,7 +34,7 @@ export function QuestionCard({
               disabled={isSubmitting}
               onClick={() => onSelect(option)}
               className={[
-                "min-h-[54px] border border-[#999999] bg-[#878683] px-4 py-3 text-[16px] font-normal text-[#F0EDE8]",
+                "min-h-[54px] bg-[#878683] px-4 py-3 text-[16px] font-normal text-[#F0EDE8]",
                 "transition-colors duration-200 hover:bg-[#9a9996] active:bg-[#6f6f6d]",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 isLast ? "col-span-2 mx-auto w-[140px]" : "w-[140px]"

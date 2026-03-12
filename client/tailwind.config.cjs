@@ -14,8 +14,8 @@ module.exports = {
         }
       },
       fontFamily: {
-        sans: ["Manrope", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "system-ui", "sans-serif"]
+        sans: ["Open Sans", "system-ui", "sans-serif"],
+        display: ["Open Sans", "system-ui", "sans-serif"]
       }
     }
   },
