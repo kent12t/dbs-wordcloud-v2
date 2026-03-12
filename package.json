@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "tsx watch --env-file=.env server/index.ts",
     "dev:client": "npm --prefix client run dev",
     "build": "npm run build:client && npm run build:server",
     "build:client": "npm --prefix client run build",

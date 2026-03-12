@@ -1,146 +1,255 @@
-import { useMemo } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { WordCloudWord } from "../../../shared/types";
 
 interface WordCloudProps {
   words: WordCloudWord[];
-  maxSize?: number;
+  /** Override the font-size cap for the highest-count word (default: 0.22 * containerHeight). */
+  maxSizeRatio?: number;
 }
 
 interface PlacedWord extends WordCloudWord {
-  x: number;
-  y: number;
-  fontSize: number;
+  x: number; // centre-x in pixels
+  y: number; // centre-y in pixels
+  fontSize: number; // px, already scaled to container
   color: string;
+  measuredWidth: number;
+  measuredHeight: number;
 }
 
-const MIN_SIZE = 14;
-const DEFAULT_MAX_SIZE = 72;
-const VIEW_WIDTH = 1000;
-const VIEW_HEIGHT = 560;
+const COLORS = [
+  "#E2231A", // DBS red — top word
+  "#FFFFFF",
+  "#F0EDE8",
+  "#D1D5DB",
+  "#9CA3AF",
+  "#6B7280",
+];
 
-function estimateWidth(text: string, fontSize: number): number {
-  return text.length * fontSize * 0.56;
+function wordColor(index: number): string {
+  return COLORS[Math.min(index, COLORS.length - 1)];
 }
 
+/** Measure text width precisely using an offscreen canvas. */
+function measureText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  fontFamily: string
+): { width: number; height: number } {
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
+  const m = ctx.measureText(text);
+  const width =
+    m.actualBoundingBoxLeft !== undefined
+      ? m.actualBoundingBoxLeft + m.actualBoundingBoxRight
+      : m.width;
+  const height =
+    m.actualBoundingBoxAscent !== undefined
+      ? m.actualBoundingBoxAscent + m.actualBoundingBoxDescent
+      : fontSize;
+  return { width, height };
+}
+
+/** AABB overlap check with a small padding. */
 function overlaps(
-  placed: PlacedWord,
-  x: number,
-  y: number,
-  width: number,
-  height: number
+  ax: number,
+  ay: number,
+  aw: number,
+  ah: number,
+  bx: number,
+  by: number,
+  bw: number,
+  bh: number,
+  pad = 6
 ): boolean {
-  const padding = 10;
-  const placedWidth = estimateWidth(placed.text, placed.fontSize);
-  const placedHeight = placed.fontSize * 1.12;
-
-  const aLeft = x - width / 2 - padding;
-  const aRight = x + width / 2 + padding;
-  const aTop = y - height / 2 - padding;
-  const aBottom = y + height / 2 + padding;
-
-  const bLeft = placed.x - placedWidth / 2 - padding;
-  const bRight = placed.x + placedWidth / 2 + padding;
-  const bTop = placed.y - placedHeight / 2 - padding;
-  const bBottom = placed.y + placedHeight / 2 + padding;
-
-  return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
+  return (
+    ax - aw / 2 - pad < bx + bw / 2 + pad &&
+    ax + aw / 2 + pad > bx - bw / 2 - pad &&
+    ay - ah / 2 - pad < by + bh / 2 + pad &&
+    ay + ah / 2 + pad > by - bh / 2 - pad
+  );
 }
 
-function computeFontSize(count: number, maxCount: number, maxSize: number): number {
-  if (maxCount === 0) {
-    return MIN_SIZE;
-  }
-  return MIN_SIZE + (count / maxCount) * (maxSize - MIN_SIZE);
-}
+function runLayout(
+  words: WordCloudWord[],
+  containerW: number,
+  containerH: number,
+  ctx: CanvasRenderingContext2D,
+  fontFamily: string,
+  maxSizeRatio: number
+): PlacedWord[] {
+  if (!words.length || containerW < 10 || containerH < 10) return [];
 
-function placeWords(words: WordCloudWord[], maxSize: number): PlacedWord[] {
-  const maxCount = Math.max(...words.map((word) => word.count), 0);
-  const centerX = VIEW_WIDTH / 2;
-  const centerY = VIEW_HEIGHT / 2;
+  const sorted = [...words].sort(
+    (a, b) => b.count - a.count || a.text.localeCompare(b.text)
+  );
+  const maxCount = sorted[0].count || 1;
 
-  const sorted = [...words].sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
-  const result: PlacedWord[] = [];
+  // The largest font is capped so it can never exceed the shorter container edge.
+  const maxFontCap = Math.min(containerW * 0.85, containerH * maxSizeRatio);
+  const minFont = Math.max(10, Math.min(14, containerH * 0.04));
 
-  sorted.forEach((word, index) => {
-    const fontSize = computeFontSize(word.count, maxCount, maxSize);
-    const width = estimateWidth(word.text, fontSize);
-    const height = fontSize * 1.12;
-    const color =
-      index === 0 ? "#E2231A" : index < 4 ? "#FFFFFF" : index < 10 ? "#D1D5DB" : "#9CA3AF";
+  // Compute raw font sizes proportional to count.
+  const rawSizes = sorted.map((w) =>
+    minFont + (w.count / maxCount) * (maxFontCap - minFont)
+  );
 
-    let placed: PlacedWord | null = null;
+  // Measure every word at its raw size and shrink the largest if it overflows.
+  const measured = rawSizes.map((fs, i) => {
+    const m = measureText(ctx, sorted[i].text, fs, fontFamily);
+    return { ...m, fontSize: fs };
+  });
 
-    for (let step = 0; step < 2200; step += 1) {
-      const angle = step * 0.47;
-      const radius = 3 * Math.sqrt(step);
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
+  // If the biggest word wider than the container, scale everything down uniformly.
+  const maxMeasuredW = Math.max(...measured.map((m) => m.width));
+  const maxMeasuredH = Math.max(...measured.map((m) => m.height));
+  let scale = 1;
+  if (maxMeasuredW > containerW - 12) scale = Math.min(scale, (containerW - 12) / maxMeasuredW);
+  if (maxMeasuredH > containerH - 12) scale = Math.min(scale, (containerH - 12) / maxMeasuredH);
 
-      const withinBounds =
-        x - width / 2 > 18 &&
-        x + width / 2 < VIEW_WIDTH - 18 &&
-        y - height / 2 > 18 &&
-        y + height / 2 < VIEW_HEIGHT - 18;
+  // Apply scale and re-measure (font change affects metrics).
+  const scaledWords = sorted.map((word, i) => {
+    const fs = measured[i].fontSize * scale;
+    const m = measureText(ctx, word.text, fs, fontFamily);
+    return { word, fontSize: fs, width: m.width, height: m.height };
+  });
 
-      if (!withinBounds) {
+  const placed: PlacedWord[] = [];
+  const centerX = containerW / 2;
+  const centerY = containerH / 2;
+
+  for (let i = 0; i < scaledWords.length; i++) {
+    const { word, fontSize, width, height } = scaledWords[i];
+    const color = wordColor(i);
+
+    let bestX = centerX;
+    let bestY = centerY;
+    let foundSpot = false;
+
+    // Archimedean spiral — same approach as d3-cloud.
+    for (let step = 0; step < 5000; step++) {
+      const angle = step * 0.5; // radians
+      const r = 2.5 * Math.sqrt(step);
+      const cx = centerX + r * Math.cos(angle);
+      const cy = centerY + r * Math.sin(angle);
+
+      // Bounds check — keep word fully inside the container with a small margin.
+      if (
+        cx - width / 2 < 4 ||
+        cx + width / 2 > containerW - 4 ||
+        cy - height / 2 < 4 ||
+        cy + height / 2 > containerH - 4
+      ) {
         continue;
       }
 
-      const collides = result.some((candidate) => overlaps(candidate, x, y, width, height));
-      if (!collides) {
-        placed = { ...word, x, y, fontSize, color };
+      // Collision check against already-placed words.
+      const collision = placed.some((p) =>
+        overlaps(cx, cy, width, height, p.x, p.y, p.measuredWidth, p.measuredHeight)
+      );
+
+      if (!collision) {
+        bestX = cx;
+        bestY = cy;
+        foundSpot = true;
         break;
       }
     }
 
-    result.push(
-      placed ?? {
-        ...word,
-        x: centerX,
-        y: centerY,
-        fontSize,
-        color
-      }
-    );
-  });
+    placed.push({
+      ...word,
+      x: bestX,
+      y: bestY,
+      fontSize,
+      color,
+      measuredWidth: width,
+      measuredHeight: height,
+      // Mark words that didn't find a spot so we can hide them gracefully.
+      ...(foundSpot ? {} : { _hidden: true }),
+    } as PlacedWord & { _hidden?: boolean });
+  }
 
-  return result;
+  return placed;
 }
 
-export function WordCloud({ words, maxSize = DEFAULT_MAX_SIZE }: WordCloudProps) {
-  const placedWords = useMemo(() => placeWords(words, maxSize), [words, maxSize]);
+export function WordCloud({ words, maxSizeRatio = 0.38 }: WordCloudProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [placed, setPlaced] = useState<(PlacedWord & { _hidden?: boolean })[]>([]);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  // Detect actual container dimensions via ResizeObserver.
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setSize({ w: Math.floor(width), h: Math.floor(height) });
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Re-run the layout whenever words or container size change.
+  useEffect(() => {
+    if (size.w < 10 || size.h < 10 || !words.length) {
+      setPlaced([]);
+      return;
+    }
+
+    // Create or reuse the offscreen canvas for text measurement.
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement("canvas");
+    }
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+
+    // Use the same font stack that's applied in the DOM.
+    const fontFamily =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--font-sans")
+        .trim() || "Inter, ui-sans-serif, system-ui, sans-serif";
+
+    const result = runLayout(words, size.w, size.h, ctx, fontFamily, maxSizeRatio);
+    setPlaced(result);
+  }, [words, size, maxSizeRatio]);
 
   if (words.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <p className="text-center text-[16px] text-dbs-muted">
-          Waiting for responses to shape the live cloud...
+          Waiting for responses to shape the live cloud…
         </p>
       </div>
     );
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div className="relative h-full w-full">
-        {placedWords.map((word) => (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+      {placed.map((word) => {
+        const hidden = (word as PlacedWord & { _hidden?: boolean })._hidden;
+        if (hidden) return null;
+        return (
           <span
             key={word.text}
-            className="absolute whitespace-nowrap font-bold transition-all duration-700 ease-out"
+            className="absolute select-none whitespace-nowrap font-black transition-all duration-700 ease-out"
             style={{
-              left: `${(word.x / VIEW_WIDTH) * 100}%`,
-              top: `${(word.y / VIEW_HEIGHT) * 100}%`,
+              left: word.x,
+              top: word.y,
               transform: "translate(-50%, -50%)",
-              fontSize: `${word.fontSize}px`,
+              fontSize: word.fontSize,
+              lineHeight: 1,
               color: word.color,
-              opacity: 0.96
             }}
           >
             {word.text}
           </span>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
