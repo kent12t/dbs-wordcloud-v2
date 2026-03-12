@@ -113,8 +113,8 @@ export function WordCloud({ words, maxSize = DEFAULT_MAX_SIZE }: WordCloudProps)
 
   if (words.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center border border-dbs-border/60 bg-black/40">
-        <p className="font-display text-xl text-dbs-muted">
+      <div className="flex h-full w-full items-center justify-center">
+        <p className="text-center text-[16px] text-dbs-muted">
           Waiting for responses to shape the live cloud...
         </p>
       </div>
@@ -122,12 +122,12 @@ export function WordCloud({ words, maxSize = DEFAULT_MAX_SIZE }: WordCloudProps)
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden border border-dbs-border/60 bg-black/50">
+    <div className="relative h-full w-full overflow-hidden">
       <div className="relative h-full w-full">
         {placedWords.map((word) => (
           <span
             key={word.text}
-            className="absolute whitespace-nowrap font-display font-bold transition-all duration-700 ease-out"
+            className="absolute whitespace-nowrap font-bold transition-all duration-700 ease-out"
             style={{
               left: `${(word.x / VIEW_WIDTH) * 100}%`,
               top: `${(word.y / VIEW_HEIGHT) * 100}%`,

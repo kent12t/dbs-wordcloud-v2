@@ -15,14 +15,22 @@ export function useWordCloud(): UseWordCloudResult {
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let reconnectTimer: number | undefined;
+    let isCancelled = false;
 
     const fetchSnapshot = async () => {
-      const response = await fetch("/api/wordcloud");
-      if (!response.ok) {
-        return;
+      try {
+        const response = await fetch("/api/wordcloud");
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as WordCloudResponse;
+        if (!isCancelled) {
+          setWords(payload.words);
+        }
+      } catch {
+        // Snapshot fetch failures are handled by retry logic.
       }
-      const payload = (await response.json()) as WordCloudResponse;
-      setWords(payload.words);
     };
 
     const scheduleReconnect = () => {
@@ -32,19 +40,34 @@ export function useWordCloud(): UseWordCloudResult {
     };
 
     const connect = () => {
+      if (isCancelled) {
+        return;
+      }
+
       eventSource = new EventSource("/api/stream");
 
       eventSource.addEventListener("open", () => {
         retryCountRef.current = 0;
         setIsConnected(true);
+        void fetchSnapshot();
       });
 
       eventSource.addEventListener("wordcloud", (event) => {
-        const payload = JSON.parse(event.data) as WordCloudResponse;
-        setWords(payload.words);
+        try {
+          const payload = JSON.parse(event.data) as WordCloudResponse;
+          if (!isCancelled) {
+            setWords(payload.words);
+          }
+        } catch {
+          // Ignore malformed stream events.
+        }
       });
 
       eventSource.onerror = () => {
+        if (isCancelled) {
+          return;
+        }
+
         setIsConnected(false);
         eventSource?.close();
         scheduleReconnect();
@@ -55,9 +78,12 @@ export function useWordCloud(): UseWordCloudResult {
     connect();
 
     return () => {
+      isCancelled = true;
+
       if (reconnectTimer !== undefined) {
         window.clearTimeout(reconnectTimer);
       }
+
       eventSource?.close();
     };
   }, []);
