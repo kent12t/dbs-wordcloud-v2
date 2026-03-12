@@ -2,7 +2,7 @@
 description: Builds the Node.js/Express backend, SQLite database layer, SSE
   streaming endpoint, and REST API for the DBS quiz word cloud app.
 mode: primary
-model: anthropic/claude-sonnet-4-5
+model: opencode/gpt-5.3-codex
 tools:
   write: true
   edit: true

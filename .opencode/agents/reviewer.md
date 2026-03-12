@@ -2,7 +2,7 @@
 description: Reviews completed code for correctness, DBS brand compliance,
   mobile UX quality, and SSE reliability before the event goes live.
 mode: subagent
-model: anthropic/claude-sonnet-4-5
+model: opencode/gpt-5.3-codex
 temperature: 0.1
 tools:
   write: false

@@ -1,0 +1,36 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "model": "opencode/gpt-5.3-codex",
+    "instructions": [
+        "AGENTS.md",
+        ".opencode/agents/backend-builder.md",
+        ".opencode/agents/frontend-builder.md",
+        ".opencode/agents/reviewer.md"
+    ],
+    "permission": {
+        "skill": {
+            "*": "allow"
+        },
+        "bash": "ask",
+        "edit": "allow",
+        "write": "allow"
+    },
+    "formatter": {
+        "prettier": {
+            "disabled": false
+        }
+    },
+    "mcp": {
+        "figma": {
+            "enabled": true,
+            "type": "remote",
+            "url": "https://mcp.figma.com/mcp",
+            "oauth": {
+                // IMPORTANT: Do NOT hardcode secrets here.
+                // These are loaded from the environment (e.g. from a local .env file).
+                "clientId": "{env:FIGMA_CLIENT_ID}",
+                "clientSecret": "{env:FIGMA_CLIENT_SECRET}"
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+client/dist/
+data/
+*.log
+.env
+*.env
+.env.local
+.opencode/mcp-auth.json
+mcp-auth.json

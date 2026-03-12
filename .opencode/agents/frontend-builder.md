@@ -2,7 +2,7 @@
 description: Builds the React/Tailwind frontend — mobile quiz, TV word cloud
   display, and result page — for the DBS quiz word cloud app.
 mode: primary
-model: anthropic/claude-sonnet-4-5
+model: opencode/gpt-5.3-codex
 tools:
   write: true
   edit: true
