@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
-    "dev:client": "vite --config client/vite.config.ts",
+    "dev:client": "npm --prefix client run dev",
     "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build --config client/vite.config.ts",
+    "build:client": "npm --prefix client run build",
     "build:server": "tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "lint": "eslint .",
