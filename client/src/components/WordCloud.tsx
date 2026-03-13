@@ -126,10 +126,11 @@ function runLayout(
     let bestY = centerY;
     let foundSpot = false;
 
-    // Archimedean spiral — same approach as d3-cloud.
-    for (let step = 0; step < 5000; step++) {
-      const angle = step * 0.5; // radians
-      const r = 2.5 * Math.sqrt(step);
+    // Archimedean spiral.
+    // We use a slightly more granular search to find tight spots.
+    for (let step = 0; step < 15000; step++) {
+      const angle = step * 0.05; // radians
+      const r = 0.1 * step; // Slow expansion to search thoroughly
       const cx = centerX + r * Math.cos(angle);
       const cy = centerY + r * Math.sin(angle);
 
@@ -140,12 +141,14 @@ function runLayout(
         cy - height / 2 < 4 ||
         cy + height / 2 > containerH - 4
       ) {
+        // Stop if we've definitely spiraled out of the container bounds.
+        if (r > Math.max(containerW, containerH)) break;
         continue;
       }
 
       // Collision check against already-placed words.
       const collision = placed.some((p) =>
-        overlaps(cx, cy, width, height, p.x, p.y, p.measuredWidth, p.measuredHeight)
+        overlaps(cx, cy, width, height, p.x, p.y, p.measuredWidth, p.measuredHeight, 4)
       );
 
       if (!collision) {
@@ -164,8 +167,7 @@ function runLayout(
       color,
       measuredWidth: width,
       measuredHeight: height,
-      // Mark words that didn't find a spot so we can hide them gracefully.
-      ...(foundSpot ? {} : { _hidden: true }),
+      _hidden: !foundSpot,
     } as PlacedWord & { _hidden?: boolean });
   }
 
@@ -215,6 +217,19 @@ export function WordCloud({ words, maxSizeRatio = 0.38 }: WordCloudProps) {
         .trim() || "Inter, ui-sans-serif, system-ui, sans-serif";
 
     const result = runLayout(words, size.w, size.h, ctx, fontFamily, maxSizeRatio);
+    console.log("WordCloud Layout Result:", JSON.stringify({
+      wordCount: words.length,
+      containerSize: size,
+      placedCount: result.length,
+      visibleCount: result.filter((w: any) => !w._hidden).length,
+      firstFiveWords: result.slice(0, 5).map((w: any) => ({
+        text: w.text,
+        x: Math.round(w.x),
+        y: Math.round(w.y),
+        fs: Math.round(w.fontSize),
+        hidden: !!w._hidden
+      }))
+    }, null, 2));
     setPlaced(result);
   }, [words, size, maxSizeRatio]);
 

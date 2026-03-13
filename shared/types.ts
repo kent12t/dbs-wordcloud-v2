@@ -15,4 +15,5 @@ export interface WordCloudWord {
 
 export interface WordCloudResponse {
   words: WordCloudWord[];
+  offline?: boolean;
 }

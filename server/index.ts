@@ -34,7 +34,10 @@ function isAnswerSubmission(payload: unknown): payload is AnswerSubmission {
 }
 
 async function buildWordCloudResponse(): Promise<WordCloudResponse> {
-  return { words: await getWordCloudWords() };
+  return {
+    words: await getWordCloudWords(),
+    offline: process.env.OFFLINE === "true"
+  };
 }
 
 function formatWordCloudEvent(payload: WordCloudResponse): string {

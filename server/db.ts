@@ -6,26 +6,57 @@ interface AnswerRow {
   answer: string | null;
 }
 
-function getRequiredEnv(name: "SUPABASE_URL" | "SUPABASE_KEY"): string {
+const isOffline = process.env.OFFLINE === "true";
+
+function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) {
+  if (!value && !isOffline) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
-
-  return value;
+  return value ?? "";
 }
 
 const supabaseUrl = getRequiredEnv("SUPABASE_URL");
 const supabaseKey = getRequiredEnv("SUPABASE_KEY");
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+const supabase = !isOffline
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
+
+const MOCK_WORDS: WordCloudWord[] = [
+  { text: "Multi-polar", count: 12 },
+  { text: "Uncertain", count: 8 },
+  { text: "Shifting", count: 5 },
+  { text: "Diversification", count: 15 },
+  { text: "Integration", count: 10 },
+  { text: "Volatile", count: 7 },
+  { text: "Normalising", count: 4 },
+  { text: "ASEAN", count: 18 },
+  { text: "India", count: 14 },
+  { text: "Stormy", count: 3 },
+  { text: "Bright ahead", count: 22 },
+  { text: "Transformation", count: 11 },
+  { text: "Regionalisation", count: 9 },
+  { text: "Elevated", count: 6 },
+  { text: "Stabilising", count: 4 },
+  { text: "China", count: 13 },
+  { text: "America", count: 5 },
+  { text: "Cloudy", count: 2 },
+  { text: "Partly sunny", count: 7 },
+  { text: "Clearing up", count: 10 }
+];
 
 export async function insertAnswers(answers: string[]): Promise<void> {
+  if (isOffline || !supabase) {
+    console.log("Offline mode: Skipping database insertion", answers);
+    return;
+  }
+
   const rows = answers.map((answer, index) => ({
     question_index: index,
     answer
@@ -38,6 +69,10 @@ export async function insertAnswers(answers: string[]): Promise<void> {
 }
 
 export async function getWordCloudWords(): Promise<WordCloudWord[]> {
+  if (isOffline || !supabase) {
+    return [...MOCK_WORDS].sort((a, b) => b.count - a.count);
+  }
+
   const { data, error } = await supabase
     .from("answers")
     .select("answer")
